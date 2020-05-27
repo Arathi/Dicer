@@ -1,0 +1,10 @@
+### 编译生成目录 ###
+.gradle/
+build/
+
+### IDEA工程文件 ###
+.idea/
+*.iml
+
+### runMiraiConsole测试生成目录
+test/

@@ -1,0 +1,6 @@
+name: "Dicer"
+author: "Arathi of Nebnizilla"
+version: "0.1.0"
+main: "com.undsf.mirai.DicerPluginMain"
+info: "简单的骰子机器人"
+depends: []
