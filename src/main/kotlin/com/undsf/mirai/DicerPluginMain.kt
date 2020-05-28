@@ -4,8 +4,11 @@ import net.mamoe.mirai.console.command.Command
 import net.mamoe.mirai.console.command.CommandSender
 import net.mamoe.mirai.console.plugins.ConfigSectionImpl
 import net.mamoe.mirai.console.plugins.PluginBase
+import net.mamoe.mirai.console.utils.isManager
 import net.mamoe.mirai.contact.Group
+import net.mamoe.mirai.contact.Member
 import net.mamoe.mirai.contact.User
+import net.mamoe.mirai.contact.isAdministrator
 import net.mamoe.mirai.event.subscribeFriendMessages
 import net.mamoe.mirai.event.subscribeGroupMessages
 import net.mamoe.mirai.message.MessageEvent
@@ -82,7 +85,7 @@ object DicerPluginMain : PluginBase() {
 
     suspend fun handleInstriction(event: MessageEvent, inst: Instruction) {
         if (inst.command == "bot") {
-            handleBot(event, inst.group, inst.args)
+            handleBot(event, inst)
             return
         }
 
@@ -120,13 +123,22 @@ object DicerPluginMain : PluginBase() {
         }
     }
 
-    suspend fun handleBot(event: MessageEvent, group: Group?, args: List<String>) {
-        if (group == null) {
+    suspend fun handleBot(event: MessageEvent, inst: Instruction) {
+        if (inst.group == null) {
             event.reply("请在群里执行该命令")
             return
         }
 
-        val groupId = group.id
+        val group = inst.group
+        val args = inst.args
+        val member: Member = inst.sender as Member
+
+        if (!member.isManager && !member.isAdministrator()) {
+            event.quoteReply("机器人管理员或群管理员才有权限执行该命令")
+            return
+        }
+
+        val groupId = group!!.id
         val hint = "参数格式错误"
         if (args.size != 1) {
             event.reply(hint)
