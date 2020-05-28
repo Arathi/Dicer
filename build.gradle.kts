@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "com.undsf.mirai"
-version = "0.1.0"
+version = "0.1.1"
 
 repositories {
     maven(url = "https://dl.bintray.com/kotlin/kotlin-eap")

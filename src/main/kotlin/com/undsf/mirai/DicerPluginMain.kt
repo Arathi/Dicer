@@ -2,19 +2,13 @@ package com.undsf.mirai
 
 import net.mamoe.mirai.console.command.Command
 import net.mamoe.mirai.console.command.CommandSender
-import net.mamoe.mirai.console.plugins.ConfigSectionImpl
 import net.mamoe.mirai.console.plugins.PluginBase
 import net.mamoe.mirai.console.utils.isManager
-import net.mamoe.mirai.contact.Group
-import net.mamoe.mirai.contact.Member
-import net.mamoe.mirai.contact.User
-import net.mamoe.mirai.contact.isAdministrator
+import net.mamoe.mirai.contact.*
 import net.mamoe.mirai.event.subscribeFriendMessages
 import net.mamoe.mirai.event.subscribeGroupMessages
 import net.mamoe.mirai.message.MessageEvent
 import net.mamoe.mirai.utils.info
-import org.jetbrains.exposed.dao.id.IntIdTable
-import org.jetbrains.exposed.dao.id.LongIdTable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.regex.Matcher
@@ -23,7 +17,7 @@ import kotlin.random.Random
 
 object DicerPluginMain : PluginBase() {
     private val config = loadConfig("dicer.yml")
-    private val rollDicePattern = Pattern.compile("r(\\d{0,3})(d(\\d{0,3}))?")
+    private val rollDicePattern = Pattern.compile("^r(\\d{0,2})(d(\\d{0,3}))?\$")
 
     private val prefix by lazy {
         config.setIfAbsent("command-prefix", ".")
@@ -133,7 +127,7 @@ object DicerPluginMain : PluginBase() {
         val args = inst.args
         val member: Member = inst.sender as Member
 
-        if (!member.isManager && !member.isAdministrator()) {
+        if (!member.isManager && !member.isAdministrator() && !member.isOperator()) {
             event.quoteReply("机器人管理员或群管理员才有权限执行该命令")
             return
         }
@@ -148,11 +142,21 @@ object DicerPluginMain : PluginBase() {
         when (args[0]) {
             "on" -> {
                 saveGroupSwitch(groupId, group.name, "on")
-                event.reply("骰娘已启动")
+                event.reply("启动骰娘")
             }
             "off" -> {
                 saveGroupSwitch(groupId, group.name, "off")
-                event.reply("骰娘已关闭")
+                event.reply("关闭骰娘")
+            }
+            "status" -> {
+                when (getGroupSwitch(groupId)) {
+                    "on" -> {
+                        event.reply("骰娘当前已开启")
+                    }
+                    "off" -> {
+                        event.reply("骰娘当前已关闭")
+                    }
+                }
             }
             else -> {
                 event.reply("开关参数无效")
@@ -181,43 +185,83 @@ object DicerPluginMain : PluginBase() {
         }
     }
 
+    fun getGroupSwitch(groupId: Long): String {
+        var status = "off"
+        transaction {
+            val query: Query = GroupSwitch.select {
+                GroupSwitch.id eq groupId
+            }
+            if (query.empty()) {
+                val gs = query.first()
+                status = gs[GroupSwitch.stat]
+            }
+        }
+        return status
+    }
+
     suspend fun handleHelp(event: MessageEvent) {
-        event.reply("""Usage:
-.bot on    开启bot
-.bot off   关闭bot
-.help      显示帮助信息
-.r         相当于.r1d100
-.r3        相当于.r3d100
-.rd        相当于.r1d100
-.r3d       相当于.r3d100
-.rd20      相当于.r1d20
-.r{x}d{y}  投x颗y面骰子""".trimIndent())
+        val sb = StringBuilder()
+        sb.appendln("Usage:")
+        sb.appendln(".bot on\t开启bot")
+        sb.appendln(".bot off\t关闭bot")
+        sb.appendln(".bot status\t查看bot状态")
+        sb.appendln(".help\t\t显示帮助信息")
+        sb.appendln(".r\t\t相当于.r1d100")
+        // sb.appendln(".r3\t\t相当于.r3d100")
+        sb.appendln(".rd\t\t相当于.r1d100")
+        // sb.appendln(".r3d\t\t相当于.r3d100")
+        // sb.appendln(".rd20\t\t相当于.r1d20")
+        sb.append(".r{x}d{y}\t投x枚y面骰子，其中x<=30且y<=100")
+        event.reply(sb.toString())
     }
 
     suspend fun handleRoll(event: MessageEvent, matcher: Matcher) {
         var amount = 1
         var face = 100
+
         if (matcher.groupCount() >= 1) {
             val amountInput = matcher.group(1)
             if (amountInput != null && amountInput.isNotEmpty()) amount = amountInput.toInt()
         }
+        if (amount < 1) {
+            amount = 1
+        }
+        if (amount > 30) {
+            amount = 30
+        }
+
         if (matcher.groupCount() >= 3) {
             val faceInput = matcher.group(3)
             if (faceInput != null && faceInput.isNotEmpty()) face = faceInput.toInt()
         }
+        if (face < 2) {
+            face = 2
+        }
+        if (face > 100) {
+            face = 100
+        }
+
         val results = roll(amount, face)
         val sb = StringBuilder()
-        sb.append("${event.sender.nick}掷骰：")
+
+        sb.append("${event.sender.nick}掷骰")
+        if (amount > 1) {
+            sb.append("${amount}次")
+        }
+        sb.append("：")
+
         var sum = 0
         for (r in results) {
             sum += r
             sb.appendln()
             sb.append("D${face}=${r}")
         }
+
         if (amount > 1) {
             sb.appendln()
             sb.append("共计${sum}点")
         }
+
         event.reply(sb.toString())
     }
 

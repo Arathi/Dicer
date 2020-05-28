@@ -1,6 +1,6 @@
 name: "Dicer"
 author: "Arathi of Nebnizilla"
-version: "0.1.0"
+version: "0.1.1"
 main: "com.undsf.mirai.DicerPluginMain"
-info: "简单的骰子机器人"
+info: "简单的骰子机器人 Web: https://github.com/Arathi/Dicer"
 depends: []
